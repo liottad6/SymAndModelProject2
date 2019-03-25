@@ -85,7 +85,7 @@ public class Event
 
     static Object RemoveFromQueue(Order order, int qNum)
     {
-        return new Event();
+        return 0;
     }
 
 
@@ -121,5 +121,8 @@ public class Event
         nextEventType = ev.GetEventType();
         tellerNumber  = ev.GetTeller();
         
+    }
+    static public void EventCancel(int event){
+
     }
 }
