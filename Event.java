@@ -76,7 +76,7 @@ public class Event
 
     static public void EventSchedule(Event ev)
     {
-
+        eventList.add(ev);
     }
 
     static public void InsertInQueue(Event ev, Order order, int qNum)
@@ -108,6 +108,7 @@ public class Event
 
     static public void Initialize()
     {
+        eventList = new LinkedList<>();
         queueLists = new ArrayList<>();
         int iter = 0;
         while (iter <= MAX_QUEUES) {
@@ -154,6 +155,6 @@ public class Event
         
     }
     static public void EventCancel(int event){
-
+        eventList.remove(event);
     }
 }
