@@ -61,7 +61,7 @@ public class Event
     {
         return eventSimTime;
     }
-    
+
     /**
      */
     public int GetEventType()
@@ -76,22 +76,46 @@ public class Event
 
     static public void EventSchedule(Event ev)
     {
+
     }
 
     static public void InsertInQueue(Event ev, Order order, int qNum)
     {
+        if(order == Order.FIRST) {
+            queueLists.get(qNum).addFirst(ev);
+        } else if (order == Order.LAST){
+            queueLists.get(qNum).addLast(ev);
+        } else if (order == Order.INCREASING){
 
+        } else { //decreasing
+
+        }
     }
 
     static Object RemoveFromQueue(Order order, int qNum)
     {
-        return 0;
+        if(order == Order.FIRST)
+        {
+            queueLists.get(qNum).removeFirst();
+        }
+        else //last
+            {
+            queueLists.get(qNum).removeLast();
+            }
+        return null;
     }
 
 
-
     static public void Initialize()
-    {        
+    {
+        queueLists = new ArrayList<>();
+        int iter = 0;
+        while (iter <= MAX_QUEUES) {
+            LinkedList<Event> list = new LinkedList<>();
+            queueLists.add(list);
+            iter ++;
+        }
+        simTime = 0;
     }
 
     static public double GetSimTime()
@@ -111,7 +135,14 @@ public class Event
 
     static public int GetQueueSize(int qNum)
     {
-        return 0;
+        int sum = 0;
+        int iter = 0;
+        while (iter < qNum) {
+            if (!queueLists.get(iter).isEmpty())
+                sum += queueLists.get(iter).size();
+            iter ++;
+        }
+        return sum;
     }
 
     static public void Timing()
