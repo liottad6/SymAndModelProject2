@@ -1,6 +1,7 @@
 import java.util.Scanner;
 import java.util.ArrayList;
 
+
 public class Bank
 {
     static ArrayList<Double> timeArrival;
@@ -13,9 +14,11 @@ public class Bank
     static final int IDLE = 0;
     static final int BUSY = 1;
 
-    static final int EVENT_ARRIVAL     = 1;  // Event type for arrival of a customer.
-    static final int EVENT_DEPARTURE   = 2;  // Event type for departure of a customer.
+    static final int EVENT_ARRIVAL     = 1;  // Event type for arrival of a customer
+    static final int EVENT_DEPARTURE   = 2;  // Event type for departure of a customer
     static final int EVENT_CLOSE_DOORS = 3;  // Event type for closing doors at 5 P.M.
+
+    static final int SAMPST_DELAYS     = 1;  // sampst variable for delays in queue(s)
 
     static final int STREAM_INTERARRIVAL = 1;
     static final int STREAM_SERVICE = 2;
@@ -45,9 +48,9 @@ public class Bank
     {
         nEvents = 2;
 
-        minTellers = 5;
+        minTellers = 4;
         // maxTellers = 7;
-        maxTellers = 5;
+        maxTellers = 7;
         meanInterArrival = 1.0;
         meanService = 4.5;
         lengthDoorsOpen = 8.0;    // in hours
@@ -61,7 +64,7 @@ public class Bank
 
         // Run the simulation while more delays are still needed
         //        for (numTellers = minTellers; numTellers <= maxTellers; ++numTellers)
-        for (numTellers = minTellers; numTellers <= minTellers; ++numTellers)
+        for (numTellers = minTellers; numTellers <= maxTellers; ++numTellers)
         {
             Event.Initialize();
 
@@ -72,7 +75,7 @@ public class Bank
             Event ev = new Event(time, EVENT_ARRIVAL);
             //System.out.println("time generated " + time);
             Event.EventSchedule(ev);
-            //Event.DisplayQueue();
+            Event.DisplayQueue();
 
             // Schedule the bank closing, in minutes
             ev = new Event(60.0 * lengthDoorsOpen, EVENT_CLOSE_DOORS);
@@ -98,7 +101,7 @@ public class Bank
                 }
             }
 
-            //Report();
+            Report();
         }
     }
 
@@ -115,14 +118,15 @@ public class Bank
         // Schedule the next arrival.
         Event ev = new Event(Event.GetSimTime() + SimLib_Random.Expon(meanInterArrival, STREAM_INTERARRIVAL), EVENT_ARRIVAL);
         Event.EventSchedule(ev);
-        //        Event.DisplayQueue();
+                Event.DisplayQueue();
 
         for (int teller = 1; teller <= numTellers; ++teller)
         {
             if (Event.GetQueueSize(numTellers + teller) == 0)  // Is the teller idle? if so, this customer has 0 delay
             {
-                ev = new Event(); // fake event
+                Event.Sampst(0.0, SAMPST_DELAYS);
 
+                ev = new Event(); // fake event, server busy
                 // Make this teller busy (attributes are irrelevant).
                 Event.InsertInQueue(ev, Event.Order.FIRST, numTellers + teller);
 
@@ -149,7 +153,7 @@ public class Bank
         }
 
         // Place the customer at the end of the leftmost shortest queue.
-        ev = new Event(); // fake event
+        ev = new Event(Event.GetSimTime(), 0); // fake event for waiting in line
         Event.InsertInQueue(ev, Event.Order.LAST, shortestQueue);
     }
 
@@ -170,7 +174,12 @@ public class Bank
         else
         {
             // There is a line at this teller, so move the first one is line, and then schedule when this customer will leave the teller
-            Event.RemoveFromQueue(Event.Order.FIRST, teller);
+            Event evRemoved = ((Event)Event.RemoveFromQueue(Event.Order.FIRST, teller));
+
+            double eTime = evRemoved.GetEventTime();
+            double delay = Event.GetSimTime() - evRemoved.GetEventTime();  // total for customer going from front of line to teller
+
+            Event.Sampst(delay, SAMPST_DELAYS);
 
             // Create the depart event for the customer now being served by teller number (teller)
             Event ev = new Event(Event.GetSimTime() + SimLib_Random.Expon(meanService, STREAM_SERVICE), EVENT_DEPARTURE, teller);
@@ -206,7 +215,8 @@ public class Bank
         {
             int lineSize     = Event.GetQueueSize(otherTeller);
             int tellerStatus = Event.GetQueueSize(numTellers + otherTeller);
-            System.out.print("(" + tellerStatus + ") - " + lineSize + " "); // Display teller state, and line size
+//System.out.print("(" + tellerStatus + ") - " + lineSize + " "); // Display teller state, and line size
+
             nj = lineSize + tellerStatus;
             distance = Math.abs(teller - otherTeller);
 
@@ -222,28 +232,49 @@ public class Bank
                 minDistance = distance;
             }
         }
-        System.out.println();
+//System.out.println();
 
         // Check to see whether a jockeying customer was found
         if (jumper > 0)
         {
-            Event.RemoveFromQueue(Event.Order.LAST, jumper);
+            Event evRemoved = ((Event)Event.RemoveFromQueue(Event.Order.LAST, jumper));
+            double eTime = evRemoved.GetEventTime();
+
             if (Event.GetQueueSize(numTellers + teller) > 0)
             {
-                // The teller of his new queue is busy, so place the customer at the end of this queue.
-                Event ev = new Event(); // fake event
-                Event.InsertInQueue(ev, Event.Order.LAST, teller);
+                // The teller of this new queue is busy, so place the jumper customer at the end of this queue.
+                Event.InsertInQueue(evRemoved, Event.Order.LAST, teller);
             }
             else
             {
                 // The teller of his new queue is idle, so tally the jockeying customer's delay, make
                 // the teller busy, and start service.
-                Event ev = new Event(); // fake event
+
+                double delay = Event.GetSimTime() - evRemoved.GetEventTime();  // total delay from back of line to switch line
+                Event.Sampst(delay, SAMPST_DELAYS);
+
+                Event ev = new Event(Event.GetSimTime(), 0); // fake event
                 Event.InsertInQueue(ev, Event.Order.FIRST, numTellers + teller);
-                System.out.println("Jockey");
                 ev = new Event(Event.GetSimTime() + SimLib_Random.Expon(meanService, STREAM_SERVICE), EVENT_DEPARTURE, teller);
                 Event.EventSchedule(ev);
             }
         }
+    }
+
+    /*****************************************************************************************************************************
+     * Report
+     */
+    static void Report()
+    {
+        double avgNumInQ = 0.0;
+
+        for (int j = 1; j <= numTellers; j++)
+        {
+            avgNumInQ += Event.Filest(j);
+        }
+        System.out.printf("\n\nWith%2d tellers, average number in queue = %10.3f", numTellers, avgNumInQ);
+
+        System.out.printf("\n\nDelays in queue, in minutes:\n");
+        Event.OutSampst(SAMPST_DELAYS, SAMPST_DELAYS);
     }
 }
